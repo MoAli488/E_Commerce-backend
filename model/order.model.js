@@ -8,13 +8,15 @@ const orderSchema = mongoose.Schema(
       ref: "Cart",
       required: true,
     },
-    orderItem: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Order-Item",
-        required: true,
-      },
-    ],
+    orderItems: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Order-Item",
+        },
+      ],
+      required: true,
+    },
     addressId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Address",

@@ -30,13 +30,7 @@ exports.addUser = catchAsyncFn(async (req, res) => {
 });
 
 exports.updateUser = catchAsyncFn(async (req, res) => {
-  const user = req.user;
-  // or email
-  const updatedUser = await findByIdAndUpdate(
-    user,
-    { ...req.body }, // TODO: find better approach for updating
-    { new: true },
-  );
+  const updatedUser = await findByIdAndUpdate(req.user._id, { ...req.body });
   if (!updatedUser) throw new AppError("User not found", 404);
   logger.info(`User ${updatedUser._id} data updated by ${req.user.email}`);
   res.status(200).json({ message: "User data updated.", data: updatedUser });

@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
-// const address = require("./address.model");
-const addressSchema = require("./address.model");
+const AppError = require("../util/appError.util");
+const logger = require("../util/logger.util");
+const address = require("./address.model");
 
 const userSchema = mongoose.Schema(
   {
@@ -22,11 +23,10 @@ const userSchema = mongoose.Schema(
     },
     phone: {
       type: String,
-      unique: true,
       trim: true,
       match: /^(\+20|0)?1[0125][0-9]{8}$/,
     },
-    addresses: [addressSchema],
+    addresses: [address.schema],
     password: {
       type: String,
       trim: true,
@@ -56,8 +56,8 @@ userSchema.pre("save", async function () {
       this.password = await bcrypt.hash(this.password, 10);
     }
   } catch (err) {
-    console.error(`Error while hashing password: ${err}`);
-    res.status(500).json({ error: err });
+    logger.error(`Error while hashing password: ${err}`);
+    throw new AppError(`Error while hashing password: ${err}`, 500);
   }
 });
 
@@ -65,7 +65,10 @@ userSchema.methods.isCorrectPassword = async function (inputPassword) {
   try {
     return await bcrypt.compare(inputPassword, this.password);
   } catch (err) {
-    throw err;
+    logger.error(`Error while comparing password: ${err}`);
+    throw new AppError(
+      logger.error(`Error while hashing password: ${err}`, 500),
+    );
   }
 };
 

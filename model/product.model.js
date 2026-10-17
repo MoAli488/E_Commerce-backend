@@ -32,7 +32,6 @@ const productSchema = mongoose.Schema(
     slug: {
       type: String,
       unique: true,
-      required: true,
       trim: true,
     },
     category: {
