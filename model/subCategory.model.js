@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const slugify = require("slugify");
 
 const subCategorySchema = mongoose.Schema({
   name: {
@@ -6,6 +7,7 @@ const subCategorySchema = mongoose.Schema({
     required: true,
     trim: true,
     minLength: 2,
+    uppercase: true,
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,
@@ -26,6 +28,12 @@ const subCategorySchema = mongoose.Schema({
     type: Boolean,
     default: false,
   },
+});
+
+subCategorySchema.pre("save", async function () {
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name);
+  }
 });
 
 module.exports = mongoose.model("Sub-Category", subCategorySchema);

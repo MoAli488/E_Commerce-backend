@@ -1,6 +1,7 @@
 const User = require("../model/user.model");
 const catchAsyncFn = require("../util/catchAsyncFn.util");
 const logger = require("../util/logger.util");
+const AppError = require("../util/appError.util");
 
 //admin only
 exports.getAllUsers = catchAsyncFn(async (req, res) => {

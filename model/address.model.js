@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const addressSchema = mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     title: {
       type: String,
       trim: true,
@@ -16,7 +21,7 @@ const addressSchema = mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Address", addressSchema);

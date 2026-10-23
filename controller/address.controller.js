@@ -36,6 +36,7 @@ exports.updateAddress = catchAsyncFn(async (req, res) => {
     });
   if (isDefault === false) address.isDefault = false;
   await user.save();
+  logger.info(`User ${user.email} updated address: ${address._id}`);
   res.status(200).json({ message: "Address updated", data: address });
 });
 

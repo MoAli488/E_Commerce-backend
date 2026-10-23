@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-export async function connectDB() {
+async function connectDB() {
   try {
     const mongoURI =
       process.env.NODE_ENV === "DEV"
@@ -13,3 +13,5 @@ export async function connectDB() {
     process.exit(1);
   }
 }
+
+module.exports = { connectDB };

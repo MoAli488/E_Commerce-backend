@@ -4,13 +4,13 @@ const MB = 1024 * 1024;
 
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
-  const allowedFiles = [".png", ".jpg", ".jpeg", "webp", ".gif"];
+  const allowedFiles = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
   if (allowedFiles.includes(ext)) {
     return cb(null, true);
   }
   cb(
     new Error(
-      "Invlaid file type.\nAllowed types: " + JSON.stringify(allowedFiles),
+      "Invalid file type.\nAllowed types: " + JSON.stringify(allowedFiles),
     ),
     false,
   );

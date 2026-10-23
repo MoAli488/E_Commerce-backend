@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const CartItem = require("./cart-item.model");
 
 const cartSchema = mongoose.Schema(
   {
@@ -7,13 +8,10 @@ const cartSchema = mongoose.Schema(
       ref: "User",
       required: true,
     },
-    cartItems: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Cart-Item",
-        required: true,
-      },
-    ],
+    cartItems: {
+      type: [CartItem.schema],
+      default: [],
+    },
   },
   { timestamps: true },
 );

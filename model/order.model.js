@@ -1,8 +1,13 @@
 const mongoose = require("mongoose");
-const orderItem = require("./order-item.model");
+const OrderItem = require("./order-item.model");
 
 const orderSchema = mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     cart: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Cart",
@@ -11,17 +16,17 @@ const orderSchema = mongoose.Schema(
     orderItems: {
       type: [
         {
-          type: mongoose.Schema.Types.ObjectId,
+          type: OrderItem.schema,
           ref: "Order-Item",
         },
       ],
       required: true,
     },
-    addressId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Address",
-      required: true,
-    },
+    // addressId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Address",
+    //   required: true,
+    // },
     address: {
       type: String,
       required: true,
@@ -40,7 +45,6 @@ const orderSchema = mongoose.Schema(
         "preparing",
         "shipped",
         "delivered",
-        "received",
         "cancelled by admin",
         "cancelled by client",
         "rejected",
@@ -48,12 +52,12 @@ const orderSchema = mongoose.Schema(
       ],
       default: "pending",
     },
-    purchasedAt: {
+    orderedAt: {
       type: Date,
       default: Date.now,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Order", orderSchema);

@@ -1,4 +1,3 @@
-const AppError = require("../util/appError.util");
 const logger = require("../util/logger.util");
 
 module.exports = (err, req, res, next) => {
@@ -14,7 +13,7 @@ module.exports = (err, req, res, next) => {
       stack: err.stack,
     });
   }
-  if (isOperational) {
+  if (err.isOperational) {
     res.status(err.statusCode).json({
       status: err.status,
       statusCode: err.statusCode,
