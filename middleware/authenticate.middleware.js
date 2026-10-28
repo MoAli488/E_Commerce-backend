@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../model/user.model");
 const AppError = require("../util/appError.util");
-// const catchAsyncFn = require("../util/catchAsyncFn.util");
 
 exports.authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -12,7 +11,7 @@ exports.authenticate = async (req, res, next) => {
   try {
     const token = authHeader.split(" ")[1];
     const decode = jwt.verify(token, process.env.SECRET_KEY);
-    req.user = await User.findById(decode._id);
+    req.user = await User.findById(decode._id).select("-password");
   } catch (e) {
     return next(new AppError("Invalid or expired token", 401));
   }
@@ -26,21 +25,19 @@ exports.authenticate = async (req, res, next) => {
   next();
 };
 
-// exports.optionalAuthenticate = async (req, res, next) => {
-//   const authHeader = req.headers.authorization;
-//   if (!authHeader?.startsWith("Bearer ")) {
-//     return next();
-//   }
+exports.optionalAuthenticate = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return next();
+  }
 
-//   try {
-//     const token = authHeader.split(" ")[1];
-//     const decode = jwt.verify(token, process.env.SECRET_KEY);
-//     const user = await User.findById(decode._id);
-//     if (user && !user.isDeleted && !user.isBlocked) {
-//       req.user = user;
-//     }
-//   } catch (e) {
-//     // Ignore invalid token for public routes
-//   }
-//   next();
-// };
+  try {
+    const token = authHeader.split(" ")[1];
+    const decode = jwt.verify(token, process.env.SECRET_KEY);
+    const user = await User.findById(decode._id).select("-password");
+    if (user && !user.isDeleted && !user.isBlocked) {
+      req.user = user;
+    }
+  } catch (e) {}
+  next();
+};

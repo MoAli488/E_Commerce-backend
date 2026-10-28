@@ -6,15 +6,22 @@ const { authorize } = require("../middleware/authorize.middleware");
 
 router.get("/", authenticate, authorize("admin"), orderController.getAllOrders);
 router.get(
+  "/stats",
+  authenticate,
+  authorize("admin"),
+  orderController.getOrderStats
+);
+router.get("/my-orders", authenticate, orderController.getUserOrders);
+router.get(
   "/:id",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   orderController.getUserOrders
 );
 router.post(
   "/create-order",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   orderController.makeOrder
 );
 router.put(
@@ -23,11 +30,11 @@ router.put(
   authorize("user", "admin"),
   orderController.updateOrderStatus
 );
-// router.delete(
-//   "/delete-order",
-//   authenticate,
-//   authorize("admin"),
-//   orderController.deleteOrder,
-// );
+router.put(
+  "/update-order/:id",
+  authenticate,
+  authorize("user", "admin"),
+  orderController.updateOrderStatus
+);
 
 module.exports = router;

@@ -7,7 +7,9 @@ const Category = require("../model/category.model");
 const SubCategory = require("../model/subCategory.model");
 const slugify = require("slugify");
 
-const filter = (req) => {
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const filter = async (req) => {
   const {
     title,
     search,
@@ -21,14 +23,38 @@ const filter = (req) => {
   const filterOptions = { isDeleted: false, isActive: true };
 
   const searchTerm = search || title;
-  if (searchTerm) {
-    filterOptions.title = { $regex: searchTerm, $options: "i" };
+  if (searchTerm && String(searchTerm).trim()) {
+    const escapedSearch = escapeRegex(String(searchTerm).trim());
+    filterOptions.title = { $regex: escapedSearch, $options: "i" };
   } else if (slug) {
     filterOptions.slug = slug;
   }
 
-  if (category) filterOptions.category = category;
-  if (category && subCategory) filterOptions.subCategory = subCategory;
+  if (category) {
+    const catSlug = slugify(category, { lower: true });
+    const foundCategory = await Category.findOne({
+      $or: [{ slug: category }, { slug: catSlug }],
+    });
+    if (!foundCategory) {
+      throw new AppError("Category not found", 404);
+    }
+    filterOptions.category = foundCategory._id;
+  }
+
+  if (subCategory) {
+    const subCatSlug = slugify(subCategory, { lower: true });
+    const subCategoryFilter = {
+      $or: [{ slug: subCategory }, { slug: subCatSlug }],
+    };
+    if (filterOptions.category) {
+      subCategoryFilter.category = filterOptions.category;
+    }
+    const foundSubCategory = await SubCategory.findOne(subCategoryFilter);
+    if (!foundSubCategory) {
+      throw new AppError("SubCategory not found", 404);
+    }
+    filterOptions.subCategory = foundSubCategory._id;
+  }
 
   if (price !== undefined) {
     filterOptions.price = Number(price);
@@ -54,50 +80,49 @@ const filter = (req) => {
   return filterOptions;
 };
 
-//admin only
 exports.addProduct = catchAsyncFn(async (req, res) => {
   const { title, description, price, stock, category, subCategory } = req.body;
 
-  if (req.file && req.file.filename) {
-    const finalSubCategory = subCategory || category;
-    const categorySlug = slugify(category);
-    const subCategorySlug = slugify(finalSubCategory);
-
-    const myCategory = await Category.findOneAndUpdate(
-      { slug: categorySlug },
-      { name: category, slug: categorySlug },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    const mySubCategory = await SubCategory.findOneAndUpdate(
-      { slug: subCategorySlug },
-      {
-        name: finalSubCategory,
-        slug: subCategorySlug,
-        category: myCategory._id,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    const imageURL = "uploads/" + req.file.filename;
-    const newProduct = await Product.create({
-      title,
-      description: description,
-      price,
-      stock,
-      category: myCategory._id,
-      subCategory: mySubCategory._id,
-      imageURL,
-    });
-    logger.info(
-      `product ${newProduct._id} created by admin: ${req.user.email}`
-    );
-    res.status(201).json({ message: "Product created.", data: newProduct });
-  } else {
+  if (!req.file || !req.file.filename) {
     throw new AppError("File image for product not uploaded", 400);
   }
+
+  const categorySlug = slugify(category, { lower: true });
+  const myCategory = await Category.findOneAndUpdate(
+    { slug: categorySlug },
+    { name: category, slug: categorySlug },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const finalSubCategory = subCategory || category;
+  const subCategorySlug = slugify(finalSubCategory, { lower: true });
+  const mySubCategory = await SubCategory.findOneAndUpdate(
+    { slug: subCategorySlug, category: myCategory._id },
+    {
+      name: finalSubCategory,
+      slug: subCategorySlug,
+      category: myCategory._id,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const imageURL = "uploads/" + req.file.filename;
+  const newProduct = await Product.create({
+    title,
+    description,
+    price: Number(price),
+    stock: Number(stock),
+    category: myCategory._id,
+    subCategory: mySubCategory._id,
+    imageURL,
+  });
+
+  logger.info(`Product ${newProduct._id} created by admin: ${req.user.email}`);
+  res.status(201).json({ message: "Product created.", data: newProduct });
 });
 
 exports.getAllProducts = catchAsyncFn(async (req, res) => {
-  const filterOptions = filter(req);
+  const filterOptions = await filter(req);
 
   if (req.query.page || req.query.limit) {
     const [products, totalPages] = await paginate(req, Product, filterOptions);
@@ -130,7 +155,6 @@ exports.getProductBySlug = catchAsyncFn(async (req, res) => {
   res.json({ message: "Product fetched", data: product });
 });
 
-//admin only
 exports.updateProduct = catchAsyncFn(async (req, res) => {
   const updateData = { ...req.body };
   if (req.file) {

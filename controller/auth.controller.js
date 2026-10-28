@@ -8,18 +8,24 @@ const logger = require("../util/logger.util");
 const createToken = (userData) => {
   const { _id, name, email, role } = userData;
   return jwt.sign({ _id, name, email, role }, process.env.SECRET_KEY, {
-    expiresIn: process.env.JWT_EXPIRIES_IN,
+    expiresIn: process.env.JWT_EXPIRIES_IN || "12h",
   });
 };
 
 exports.login = catchAsyncFn(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
-  if (!user || user.isDeleted) throw new AppError("User not found", 404);
-  if (user.isBlocked) throw new AppError("Your account has been blocked", 403);
+  if (!user || user.isDeleted) {
+    throw new AppError("Invalid email or password", 401);
+  }
+  if (user.isBlocked) {
+    throw new AppError("Your account has been blocked", 403);
+  }
 
   const passwordMatch = await user.isCorrectPassword(password);
-  if (!passwordMatch) throw new AppError("Invalid email or password", 401);
+  if (!passwordMatch) {
+    throw new AppError("Invalid email or password", 401);
+  }
   logger.info(`User logged in: ${user.email}`);
   res.json({ message: "Logged In", token: createToken(user) });
 });
@@ -27,8 +33,9 @@ exports.login = catchAsyncFn(async (req, res) => {
 exports.signup = catchAsyncFn(async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
   try {
-    if (password !== confirmPassword)
+    if (password !== confirmPassword) {
       throw new AppError("Password and confirm password do not match", 400);
+    }
     const newUser = await User.create({
       name,
       email,

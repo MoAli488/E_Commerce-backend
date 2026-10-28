@@ -20,6 +20,7 @@ app.use("/api/v1/user", require("./route/user.route"));
 app.use("/api/v1/auth", require("./route/auth.route"));
 app.use("/api/v1/cart", require("./route/cart.route"));
 app.use("/api/v1/order", require("./route/order.route"));
+app.use("/api/v1/testimonial", require("./route/testimonial.route"));
 
 app.use((req, res, next) => {
   next(new AppError(`Can't find page with URL: "${req.originalUrl}"`, 404));

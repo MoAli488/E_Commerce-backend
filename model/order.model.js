@@ -14,19 +14,9 @@ const orderSchema = mongoose.Schema(
       required: true,
     },
     orderItems: {
-      type: [
-        {
-          type: OrderItem.schema,
-          ref: "Order-Item",
-        },
-      ],
+      type: [OrderItem.schema],
       required: true,
     },
-    // addressId: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Address",
-    //   required: true,
-    // },
     address: {
       type: String,
       required: true,

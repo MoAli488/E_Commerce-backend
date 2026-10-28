@@ -2,7 +2,8 @@ const paginate = async (req, Model, filterOptions = {}) => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 6;
   const skip = (page - 1) * limit;
-  const sortBy = req.query.sort || "createdAt";
+  const sortBy =
+    req.query.sort || (Model.schema.paths.createdAt ? "createdAt" : "date");
   const order = req.query.order === "desc" ? -1 : 1;
 
   let query = Model.find(filterOptions)
@@ -12,6 +13,10 @@ const paginate = async (req, Model, filterOptions = {}) => {
 
   if (Model.schema.paths.category) {
     query = query.populate("category subCategory");
+  }
+
+  if (Model.schema.paths.user) {
+    query = query.populate("user", "name email");
   }
 
   const [result, total] = await Promise.all([

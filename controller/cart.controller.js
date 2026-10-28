@@ -6,11 +6,11 @@ const AppError = require("../util/appError.util");
 const CartItem = require("../model/cart-item.model");
 
 exports.getCart = catchAsyncFn(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id }).populate(
+  let cart = await Cart.findOne({ user: req.user._id }).populate(
     "cartItems.item"
   );
   if (!cart) {
-    throw new AppError("Cart not found", 404);
+    cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
   cart.cartItems = cart.cartItems.filter((cartItem) => {
     return cartItem.item && !cartItem.item.isDeleted && cartItem.item.isActive;
@@ -29,9 +29,9 @@ exports.getCart = catchAsyncFn(async (req, res) => {
 });
 
 exports.addCartItem = catchAsyncFn(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id });
+  let cart = await Cart.findOne({ user: req.user._id });
   if (!cart) {
-    throw new AppError("Cart not found", 404);
+    cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
   const product = await Product.findById(req.body.item);
   if (!product || product.isDeleted || !product.isActive) {
@@ -56,6 +56,7 @@ exports.addCartItem = catchAsyncFn(async (req, res) => {
   }
 
   await cart.save();
+  await cart.populate("cartItems.item");
   logger.info(`User ${req.user.email} added item to cart: ${req.body.item}`);
   res.status(201).json({ message: "Product added to cart", data: cart });
 });
@@ -66,12 +67,16 @@ exports.addGuestCartItems = catchAsyncFn(async (req, res) => {
     cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
 
-  const guestItems = req.body.cartItems || [];
+  const guestItems = Array.isArray(req.body)
+    ? req.body
+    : req.body.cartItems || [];
   if (!Array.isArray(guestItems) || guestItems.length === 0) {
     throw new AppError("No items provided", 400);
   }
 
-  const itemIds = guestItems.map((ci) => ci.item || ci._id);
+  const itemIds = guestItems.map(
+    (ci) => ci.item?._id || ci.item || ci._id
+  );
 
   const products = await Product.find({
     _id: { $in: itemIds },
@@ -86,7 +91,11 @@ exports.addGuestCartItems = catchAsyncFn(async (req, res) => {
   const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
   for (const guestItem of guestItems) {
-    const productId = guestItem.item?.toString();
+    const productId = (
+      guestItem.item?._id ||
+      guestItem.item ||
+      guestItem._id
+    )?.toString();
     const product = productMap.get(productId);
 
     if (!product) continue;
@@ -113,6 +122,7 @@ exports.addGuestCartItems = catchAsyncFn(async (req, res) => {
   }
 
   await cart.save();
+  await cart.populate("cartItems.item");
   logger.info(`User ${req.user.email} merged guest cart`);
   res
     .status(200)
@@ -120,11 +130,11 @@ exports.addGuestCartItems = catchAsyncFn(async (req, res) => {
 });
 
 exports.updateCartItem = catchAsyncFn(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id }).populate(
+  let cart = await Cart.findOne({ user: req.user._id }).populate(
     "cartItems.item"
   );
   if (!cart) {
-    throw new AppError("Cart not found", 404);
+    cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
   const itemId = req.params?.itemId || req.body?.id;
   const cartItem = cart.cartItems.find(
@@ -149,9 +159,9 @@ exports.updateCartItem = catchAsyncFn(async (req, res) => {
 });
 
 exports.removeCartItem = catchAsyncFn(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id });
+  let cart = await Cart.findOne({ user: req.user._id });
   if (!cart) {
-    throw new AppError("Cart not found", 404);
+    cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
   const itemId = req.params?.itemId || req.body?.id;
   cart.cartItems = cart.cartItems.filter(
@@ -160,14 +170,15 @@ exports.removeCartItem = catchAsyncFn(async (req, res) => {
       cartItem._id?.toString() !== itemId?.toString()
   );
   await cart.save();
+  await cart.populate("cartItems.item");
   logger.info(`User ${req.user.email} removed cart item: ${itemId}`);
   res.json({ message: "Cart item removed", data: cart });
 });
 
 exports.clearCart = catchAsyncFn(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id });
+  let cart = await Cart.findOne({ user: req.user._id });
   if (!cart) {
-    throw new AppError("Cart not found", 404);
+    cart = await Cart.create({ user: req.user._id, cartItems: [] });
   }
   await CartItem.deleteMany({ cart: cart._id });
   cart.cartItems = [];

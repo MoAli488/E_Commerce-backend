@@ -4,31 +4,41 @@ const cartController = require("../controller/cart.controller");
 const { authenticate } = require("../middleware/authenticate.middleware");
 const { authorize } = require("../middleware/authorize.middleware");
 
-router.get("/", authenticate, authorize("user"), cartController.getCart);
+router.get(
+  "/",
+  authenticate,
+  authorize("user", "admin"),
+  cartController.getCart
+);
 router.post(
   "/item",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   cartController.addCartItem
 );
 router.post(
   "/item/guest",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   cartController.addGuestCartItems
 );
 router.put(
   "/item/:itemId",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   cartController.updateCartItem
 );
 router.delete(
   "/item/:itemId",
   authenticate,
-  authorize("user"),
+  authorize("user", "admin"),
   cartController.removeCartItem
 );
-router.delete("/", authenticate, authorize("user"), cartController.clearCart);
+router.delete(
+  "/",
+  authenticate,
+  authorize("user", "admin"),
+  cartController.clearCart
+);
 
 module.exports = router;

@@ -10,15 +10,23 @@ const logger = require("../util/logger.util");
 exports.getAllOrders = catchAsyncFn(async (req, res) => {
   const orders = await Order.find()
     .populate("user", "name email phone")
-    .select("-cart");
+    .select("-cart")
+    .sort({ createdAt: -1 });
   logger.info(`Orders fetched by admin: ${req.user.email}`);
   res.json({ message: "Orders fetched", data: orders });
 });
 
 exports.getUserOrders = catchAsyncFn(async (req, res) => {
-  const orders = await Order.find({ user: req.user._id })
+  const query =
+    req.user.role === "admin" && req.params.id && req.params.id !== req.user._id
+      ? { user: req.params.id }
+      : { user: req.user._id };
+
+  const orders = await Order.find(query)
     .populate("orderItems.item")
-    .select("-user -cart");
+    .select("-user -cart")
+    .sort({ createdAt: -1 });
+
   if (!orders) throw new AppError("Orders not found", 404);
   logger.info(`Orders fetched for user: ${req.user.email}`);
   res.json({ message: "User orders fetched", data: orders });
@@ -27,7 +35,6 @@ exports.getUserOrders = catchAsyncFn(async (req, res) => {
 exports.makeOrder = catchAsyncFn(async (req, res) => {
   const user = req.user;
 
-  // 1. Resolve phone number
   const phone = req.body.phone || user.phone;
   if (!phone) {
     throw new AppError("Phone number is required", 400);
@@ -37,7 +44,6 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     throw new AppError("Invalid phone number format", 400);
   }
 
-  // 2. Resolve address
   let address = req.body.address;
   if (!address && req.body.addressId) {
     const selectedAddress =
@@ -59,7 +65,6 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     throw new AppError("Delivery address is required", 400);
   }
 
-  // 3. Find and validate user's cart
   const cart = await Cart.findOne({ user: user._id }).populate(
     "cartItems.item"
   );
@@ -67,7 +72,6 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     throw new AppError("Cart is empty", 400);
   }
 
-  // Check if any product is deleted or inactive
   const invalidItems = cart.cartItems.filter(
     (cartItem) =>
       !cartItem.item || cartItem.item.isDeleted || !cartItem.item.isActive
@@ -79,7 +83,6 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     );
   }
 
-  // Check stock availability for all items
   const insufficientStockItems = cart.cartItems.filter(
     (cartItem) => cartItem.item.stock < cartItem.quantity
   );
@@ -93,11 +96,30 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     throw new AppError(`Not enough stock for: ${details}`, 400);
   }
 
-  // 4. Perform atomic transaction
+  const orderId = new mongoose.Types.ObjectId();
+  const orderItems = cart.cartItems.map((cartItem) => ({
+    order: orderId,
+    item: cartItem.item._id,
+    name: cartItem.item.title,
+    quantity: cartItem.quantity,
+    unit_price: cartItem.item.price,
+  }));
+
+  const newOrder = new Order({
+    _id: orderId,
+    user: user._id,
+    cart: cart._id,
+    orderItems,
+    address,
+    phone,
+    status: "pending",
+    orderedAt: new Date(),
+  });
+
   const session = await mongoose.startSession();
   session.startTransaction();
+
   try {
-    // Decrement stock for products atomically
     const bulkStockOps = cart.cartItems.map((cartItem) => ({
       updateOne: {
         filter: { _id: cartItem.item._id, stock: { $gte: cartItem.quantity } },
@@ -113,37 +135,13 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
       );
     }
 
-    // Build order items
-    const orderId = new mongoose.Types.ObjectId();
-    const orderItems = cart.cartItems.map((cartItem) => ({
-      order: orderId,
-      item: cartItem.item._id,
-      name: cartItem.item.title,
-      quantity: cartItem.quantity,
-      unit_price: cartItem.item.price,
-    }));
-
-    // Create and save new order
-    const newOrder = new Order({
-      _id: orderId,
-      user: user._id,
-      cart: cart._id,
-      orderItems,
-      address,
-      phone,
-      status: "pending",
-      orderedAt: new Date(),
-    });
     await newOrder.save({ session });
 
-    // Clear cart and delete cart items
     await CartItem.deleteMany({ cart: cart._id }, { session });
     cart.cartItems = [];
     await cart.save({ session });
 
-    // Commit transaction
     await session.commitTransaction();
-    session.endSession();
 
     logger.info(`Order ${newOrder._id} created for user: ${user.email}`);
     res.status(201).json({
@@ -152,35 +150,133 @@ exports.makeOrder = catchAsyncFn(async (req, res) => {
     });
   } catch (e) {
     await session.abortTransaction();
-    session.endSession();
     logger.error(
-      `Error while making order to user ${user.email}, Err: ${e.message}`
+      `Error while making order for user ${user.email}, Err: ${e.message}`
     );
-    throw e.statusCode ? e : new AppError(e.message, 500);
+    throw e;
+  } finally {
+    await session.endSession();
   }
 });
 
 exports.updateOrderStatus = catchAsyncFn(async (req, res) => {
-  const orderId = req.body.id || req.body.orderId || req.params.id;
+  const orderId = req.params.id || req.body.id || req.body.orderId;
   if (!orderId) {
     throw new AppError("Order ID is required", 400);
   }
-  const updatedOrder = await Order.findByIdAndUpdate(
-    orderId,
-    {
-      status: req.body.status,
-    },
-    { new: true, runValidators: true }
-  );
-  if (!updatedOrder) {
+
+  const query = { _id: orderId };
+  if (req.user.role !== "admin") {
+    query.user = req.user._id;
+    if (
+      req.body.status !== "cancelled by client" &&
+      req.body.status !== "refunded"
+    ) {
+      throw new AppError("Unauthorized to set this status", 403);
+    }
+  }
+
+  const existingOrder = await Order.findOne(query);
+  if (!existingOrder) {
     throw new AppError("Order not found", 404);
   }
+
+  const oldStatus = existingOrder.status;
+  const newStatus = req.body.status;
+
+  if (oldStatus !== newStatus) {
+    const cancelledStatuses = [
+      "cancelled by admin",
+      "cancelled by client",
+      "rejected",
+      "refunded",
+    ];
+    const isCancelling =
+      cancelledStatuses.includes(newStatus) &&
+      !cancelledStatuses.includes(oldStatus);
+
+    if (isCancelling && existingOrder.orderItems?.length > 0) {
+      const restoreStockOps = existingOrder.orderItems.map((oi) => ({
+        updateOne: {
+          filter: { _id: oi.item },
+          update: { $inc: { stock: oi.quantity } },
+        },
+      }));
+      await Product.bulkWrite(restoreStockOps);
+      logger.info(`Stock restored for cancelled order: ${existingOrder._id}`);
+    }
+
+    existingOrder.status = newStatus;
+    await existingOrder.save();
+  }
+
   logger.info(
-    `Order ${updatedOrder._id} status updated to: ${updatedOrder.status}`
+    `Order ${existingOrder._id} status updated to: ${existingOrder.status}`
   );
   res.json({
-    message: `Order ${updatedOrder._id} status updated to: ${updatedOrder.status}`,
-    data: updatedOrder,
+    message: `Order ${existingOrder._id} status updated to: ${existingOrder.status}`,
+    data: existingOrder,
   });
 });
 
+exports.getOrderStats = catchAsyncFn(async (req, res) => {
+  const stats = await Order.aggregate([
+    {
+      $facet: {
+        statusBreakdown: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+        summary: [
+          { $unwind: "$orderItems" },
+          {
+            $group: {
+              _id: null,
+              totalRevenue: {
+                $sum: {
+                  $multiply: ["$orderItems.unit_price", "$orderItems.quantity"],
+                },
+              },
+              totalUnitsSold: { $sum: "$orderItems.quantity" },
+            },
+          },
+        ],
+        topProducts: [
+          { $unwind: "$orderItems" },
+          {
+            $group: {
+              _id: "$orderItems.item",
+              name: { $first: "$orderItems.name" },
+              unitsSold: { $sum: "$orderItems.quantity" },
+              totalSales: {
+                $sum: {
+                  $multiply: ["$orderItems.unit_price", "$orderItems.quantity"],
+                },
+              },
+            },
+          },
+          { $sort: { unitsSold: -1 } },
+          { $limit: 5 },
+        ],
+      },
+    },
+  ]);
+
+  const raw = stats[0] || {};
+  const statusMap = {};
+  (raw.statusBreakdown || []).forEach((s) => {
+    statusMap[s._id] = s.count;
+  });
+
+  const summary = (raw.summary && raw.summary[0]) || {
+    totalRevenue: 0,
+    totalUnitsSold: 0,
+  };
+
+  res.json({
+    message: "Order analytics fetched",
+    data: {
+      totalRevenue: summary.totalRevenue,
+      totalUnitsSold: summary.totalUnitsSold,
+      statusBreakdown: statusMap,
+      topProducts: raw.topProducts || [],
+    },
+  });
+});

@@ -16,7 +16,6 @@ const subCategorySchema = mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,
     required: true,
     trim: true,
   },
@@ -29,6 +28,8 @@ const subCategorySchema = mongoose.Schema({
     default: false,
   },
 });
+
+// subCategorySchema.index({ slug: 1, category: 1 }, { unique: true });
 
 subCategorySchema.pre("validate", function () {
   if (this.name && (!this.slug || this.isModified("name"))) {

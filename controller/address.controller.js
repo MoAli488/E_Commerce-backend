@@ -15,7 +15,12 @@ exports.addAddress = catchAsyncFn(async (req, res) => {
     user.addresses.forEach((address) => {
       address.isDefault = false;
     });
-  user.addresses.push({ title, location, isDefault: makeDefault });
+  user.addresses.push({
+    user: user._id,
+    title,
+    location,
+    isDefault: makeDefault,
+  });
   const newAddress = user.addresses[user.addresses.length - 1];
   await user.save();
   logger.info(`User ${user.email} added address: ${newAddress._id}`);

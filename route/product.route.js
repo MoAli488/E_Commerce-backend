@@ -1,12 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const productController = require("../controller/product.controller");
-const { authenticate } = require("../middleware/authenticate.middleware");
+const {
+  authenticate,
+  optionalAuthenticate,
+} = require("../middleware/authenticate.middleware");
 const { authorize } = require("../middleware/authorize.middleware");
 const upload = require("../middleware/upload.middleware");
 
-router.get("/", productController.getAllProducts);
-router.get("/:slug", productController.getProductBySlug);
+router.get("/", optionalAuthenticate, productController.getAllProducts);
+router.get("/:slug", optionalAuthenticate, productController.getProductBySlug);
 router.post(
   "/",
   authenticate,
