@@ -5,18 +5,8 @@ const { authenticate } = require("../middleware/authenticate.middleware");
 const { authorize } = require("../middleware/authorize.middleware");
 const upload = require("../middleware/upload.middleware");
 
-router.get(
-  "/",
-  authenticate,
-  authorize("user", "admin"),
-  productController.getAllProducts
-);
-router.get(
-  "/:slug",
-  authenticate,
-  authorize("user", "admin"),
-  productController.getProductBySlug
-);
+router.get("/", productController.getAllProducts);
+router.get("/:slug", productController.getProductBySlug);
 router.post(
   "/",
   authenticate,

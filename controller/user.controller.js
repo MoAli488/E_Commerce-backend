@@ -15,7 +15,7 @@ exports.getAllUsers = catchAsyncFn(async (req, res) => {
 //admin only
 exports.getUserByEmail = catchAsyncFn(async (req, res) => {
   const user = await User.findOne({ email: req.params.email }).select(
-    "-password",
+    "-password"
   );
   if (!user) throw new AppError("User not found", 404);
   logger.info(`User fetched by email: ${user.email}`);
@@ -31,7 +31,17 @@ exports.addUser = catchAsyncFn(async (req, res) => {
 });
 
 exports.updateUser = catchAsyncFn(async (req, res) => {
-  const updatedUser = await findByIdAndUpdate(req.user._id, { ...req.body });
+  const userData = req.body;
+  if (role !== "admin") {
+    delete userData.role;
+    delete userData.isDeleted;
+    delete userData.isBlocked;
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(req.user._id, userData, {
+    new: true,
+    runValidators: true,
+  }).select("-password");
   if (!updatedUser) throw new AppError("User not found", 404);
   logger.info(`User ${updatedUser._id} data updated by ${req.user.email}`);
   res.status(200).json({ message: "User data updated.", data: updatedUser });
@@ -41,8 +51,8 @@ exports.updateUser = catchAsyncFn(async (req, res) => {
 exports.deleteUser = catchAsyncFn(async (req, res) => {
   const deleteUser = await User.findByIdAndUpdate(
     req.params.id,
-    { isDeleted: true, isActive: false },
-    { new: true },
+    { isDeleted: true },
+    { new: true }
   );
   if (!deleteUser) throw new AppError("User not found", 404);
   logger.info(`User ${deleteUser.email} deleted by admin: ${req.user.email}`);

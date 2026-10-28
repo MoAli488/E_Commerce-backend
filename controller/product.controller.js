@@ -8,22 +8,49 @@ const SubCategory = require("../model/subCategory.model");
 const slugify = require("slugify");
 
 const filter = (req) => {
-  const { title, slug, category, subCategory, price, minPrice, maxPrice } =
-    req.query;
+  const {
+    title,
+    search,
+    slug,
+    category,
+    subCategory,
+    price,
+    minPrice,
+    maxPrice,
+  } = req.query;
   const filterOptions = { isDeleted: false, isActive: true };
-  if (title) filterOptions.title = title;
-  else if (slug) filterOptions.slug = slug;
+
+  const searchTerm = search || title;
+  if (searchTerm) {
+    filterOptions.title = { $regex: searchTerm, $options: "i" };
+  } else if (slug) {
+    filterOptions.slug = slug;
+  }
+
   if (category) filterOptions.category = category;
   if (category && subCategory) filterOptions.subCategory = subCategory;
-  if (price) filterOptions.price = price;
-  else {
-    if (minPrice) filterOptions.minPrice = minPrice;
-    if (maxPrice) filterOptions.maxPrice = maxPrice;
+
+  if (price !== undefined) {
+    filterOptions.price = Number(price);
+  } else if (minPrice !== undefined || maxPrice !== undefined) {
+    filterOptions.price = {};
+    if (minPrice !== undefined) filterOptions.price.$gte = Number(minPrice);
+    if (maxPrice !== undefined) filterOptions.price.$lte = Number(maxPrice);
   }
-  if (req?.user.role === "admin") {
-    filterOptions.isDeleted = req.query?.filterDelete;
-    filterOptions.isActive = req.query?.filterActive;
+
+  if (req.user?.role === "admin") {
+    if (req.query?.filterDelete !== undefined) {
+      filterOptions.isDeleted = req.query.filterDelete === "true";
+    } else {
+      delete filterOptions.isDeleted;
+    }
+    if (req.query?.filterActive !== undefined) {
+      filterOptions.isActive = req.query.filterActive === "true";
+    } else {
+      delete filterOptions.isActive;
+    }
   }
+
   return filterOptions;
 };
 
@@ -70,22 +97,21 @@ exports.addProduct = catchAsyncFn(async (req, res) => {
 });
 
 exports.getAllProducts = catchAsyncFn(async (req, res) => {
-  const filters = filter(req);
-  const {
-    minPrice = 0,
-    maxPrice = Number.MAX_SAFE_INTEGER,
-    ...filterOptions
-  } = filters;
-  if (minPrice && maxPrice) {
-    filterOptions.$and = [
-      { price: { $gte: minPrice } },
-      { price: { $lte: maxPrice } },
-    ];
+  const filterOptions = filter(req);
+
+  if (req.query.page || req.query.limit) {
+    const [products, totalPages] = await paginate(req, Product, filterOptions);
+    logger.info("Products fetched with pagination");
+    return res.json({
+      message: "Products fetched",
+      totalPages,
+      data: products,
+    });
   }
+
   const products = await Product.find(filterOptions).populate(
     "category subCategory"
   );
-  // const [products, totalPages] = await paginate(req, Product, filterOptions);
 
   logger.info("Products fetched");
   res.json({ message: "Products fetched", data: products });
@@ -106,17 +132,22 @@ exports.getProductBySlug = catchAsyncFn(async (req, res) => {
 
 //admin only
 exports.updateProduct = catchAsyncFn(async (req, res) => {
-  // TODO: find better approach for updating
+  const updateData = { ...req.body };
+  if (req.file) {
+    updateData.imageURL = "uploads/" + req.file.filename;
+  }
+  if (updateData?.title)
+    updateData.slug = slugify(updateData.title, { lower: true });
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
-    { ...req.body },
-    { new: true }
+    updateData,
+    { new: true, runValidators: true }
   );
   if (!updatedProduct) throw new AppError("Product not found", 404);
   logger.info(
     `Product ${updatedProduct._id} updated by admin: ${req.user.email}`
   );
-  res.json({ message: "Product deleted", data: updatedProduct });
+  res.json({ message: "Product updated", data: updatedProduct });
 });
 
 exports.deleteProduct = catchAsyncFn(async (req, res) => {

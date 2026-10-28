@@ -65,10 +65,8 @@ userSchema.methods.isCorrectPassword = async function (inputPassword) {
   try {
     return await bcrypt.compare(inputPassword, this.password);
   } catch (err) {
-    logger.error(`Error while comparing password: ${err}`);
-    throw new AppError(
-      logger.error(`Error while hashing password: ${err}`, 500)
-    );
+    logger.error(`Error while comparing password: ${err.message}`);
+    throw new AppError("Error while verifying password", 500);
   }
 };
 

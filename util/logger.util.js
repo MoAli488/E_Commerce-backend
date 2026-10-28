@@ -1,6 +1,6 @@
 const { createLogger, format, transports } = require("winston");
 
-const logger = new createLogger({
+const logger = createLogger({
   level: process.env.NODE_ENV === "DEV" ? "debug" : "info",
   format: format.combine(
     format.timestamp({ format: "DD-MM-YYYY HH:mm:ss" }),
@@ -11,7 +11,7 @@ const logger = new createLogger({
   ),
   transports: [
     new transports.Console(),
-    new transports.File({ filename: "logs/erro.log", level: "error" }),
+    new transports.File({ filename: "logs/error.log", level: "error" }),
     new transports.File({ filename: "logs/combined.log" }),
   ],
 });

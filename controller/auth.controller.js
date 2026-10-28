@@ -15,7 +15,9 @@ const createToken = (userData) => {
 exports.login = catchAsyncFn(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
-  if (!user) throw new AppError("User not found", 404);
+  if (!user || user.isDeleted) throw new AppError("User not found", 404);
+  if (user.isBlocked) throw new AppError("Your account has been blocked", 403);
+
   const passwordMatch = await user.isCorrectPassword(password);
   if (!passwordMatch) throw new AppError("Invalid email or password", 401);
   logger.info(`User logged in: ${user.email}`);
@@ -26,7 +28,7 @@ exports.signup = catchAsyncFn(async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
   try {
     if (password !== confirmPassword)
-      throw new AppError("Password and confirm password are not matched", 401);
+      throw new AppError("Password and confirm password do not match", 400);
     const newUser = await User.create({
       name,
       email,
@@ -41,8 +43,8 @@ exports.signup = catchAsyncFn(async (req, res) => {
     if (err.code === 11000) {
       logger.error(`Signup failed: Email already exists - ${email}`);
       throw new AppError(
-        "User with same email already exist, use different email.",
-        401
+        "User with same email already exists, use a different email.",
+        409
       );
     }
     logger.error(`Signup error: ${err.message}`);

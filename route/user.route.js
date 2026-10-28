@@ -5,6 +5,15 @@ const { authenticate } = require("../middleware/authenticate.middleware");
 const { authorize } = require("../middleware/authorize.middleware");
 const addressController = require("../controller/address.controller");
 
+// Address routes (must precede parameterized routes like /:email and /:id)
+router.get("/address", authenticate, (req, res) =>
+  res.json({ data: req.user.addresses })
+);
+router.post("/address", authenticate, addressController.addAddress);
+router.patch("/address/:id", authenticate, addressController.updateAddress);
+router.delete("/address/:id", authenticate, addressController.deleteAddress);
+
+// User routes
 router.get("/", authenticate, authorize("admin"), userController.getAllUsers);
 router.get(
   "/:email",
@@ -25,12 +34,5 @@ router.delete(
   authorize("admin"),
   userController.deleteUser
 );
-
-router.post("/address", authenticate, addressController.addAddress);
-router.get("/address", authenticate, (req, res) =>
-  res.json({ data: req.user.addresses })
-);
-router.patch("/address/:id", authenticate, addressController.updateAddress);
-router.delete("/address/:id", authenticate, addressController.deleteAddress);
 
 module.exports = router;

@@ -6,22 +6,28 @@ const { authorize } = require("../middleware/authorize.middleware");
 
 router.get("/", authenticate, authorize("user"), cartController.getCart);
 router.post(
-  "/items",
+  "/item",
   authenticate,
   authorize("user"),
-  cartController.addCartItem,
+  cartController.addCartItem
+);
+router.post(
+  "/item/guest",
+  authenticate,
+  authorize("user"),
+  cartController.addGuestCartItems
 );
 router.put(
-  "/items/:itemId",
+  "/item/:itemId",
   authenticate,
   authorize("user"),
-  cartController.updateCartItem,
+  cartController.updateCartItem
 );
 router.delete(
-  "/items/:itemId",
+  "/item/:itemId",
   authenticate,
   authorize("user"),
-  cartController.removeCartItem,
+  cartController.removeCartItem
 );
 router.delete("/", authenticate, authorize("user"), cartController.clearCart);
 

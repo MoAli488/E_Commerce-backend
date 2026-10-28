@@ -53,13 +53,13 @@ const productSchema = mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 //generate slug
 productSchema.pre("save", async function () {
   if (this.isModified("title")) {
-    this.slug = slugify(this.title);
+    this.slug = slugify(this.title, { lower: true });
   }
 });
 

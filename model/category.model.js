@@ -25,9 +25,9 @@ const categorySchema = mongoose.Schema({
   },
 });
 
-categorySchema.pre("save", async function () {
-  if (this.isModified("name")) {
-    this.slug = slugify(this.name);
+categorySchema.pre("validate", function () {
+  if (this.name && (!this.slug || this.isModified("name"))) {
+    this.slug = slugify(this.name, { lower: true });
   }
 });
 

@@ -30,9 +30,9 @@ const subCategorySchema = mongoose.Schema({
   },
 });
 
-subCategorySchema.pre("save", async function () {
-  if (this.isModified("name")) {
-    this.slug = slugify(this.name);
+subCategorySchema.pre("validate", function () {
+  if (this.name && (!this.slug || this.isModified("name"))) {
+    this.slug = slugify(this.name, { lower: true });
   }
 });
 
