@@ -143,7 +143,13 @@ exports.getAllProducts = catchAsyncFn(async (req, res) => {
 });
 
 exports.getProductBySlug = catchAsyncFn(async (req, res) => {
-  const product = await Product.findOne({ slug: req.params.slug }).populate(
+  const query = { slug: req.params.slug };
+  if (req.user?.role !== "admin") {
+    query.isDeleted = false;
+    query.isActive = true;
+  }
+
+  const product = await Product.findOne(query).populate(
     "category subCategory"
   );
   if (!product)

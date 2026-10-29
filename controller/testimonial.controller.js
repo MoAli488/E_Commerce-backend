@@ -183,7 +183,7 @@ exports.updateTestimonial = catchAsyncFn(async (req, res) => {
   if (comment !== undefined) testimonial.comment = comment;
   if (rate !== undefined) {
     const numRate = Number(rate);
-    if (numRate || numRate < 1 || numRate > 5) {
+    if (isNaN(numRate) || numRate < 1 || numRate > 5) {
       throw new AppError("Rate must be a number between 1 and 5", 400);
     }
     testimonial.rate = numRate;
